@@ -11,7 +11,7 @@
 
   "content_scripts": [
     {
-      "matches": ["*://steamcommunity.com/id/*"],
+      "matches": ["*://steamcommunity.com/id/*/wishlist"],
       "js": ["steamwishlistreader.js"]
     }
   ]
