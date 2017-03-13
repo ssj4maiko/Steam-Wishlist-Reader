@@ -1,0 +1,19 @@
+{
+
+  "description": "Exports Steam Wishlist to CSV, open on Spreadsheet software, rearrange order, import back, reorganization Easier!",
+  "manifest_version": 2,
+  "name": "Steam Wishlist Exporter",
+  "version": "1.0",
+  "homepage_url": "https://github.com/ssj4maiko/Firefox-Addon---Steam-Wishlist-Exporter-Importer",
+  "icons": {
+    "48": "icons/border-48.png"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["*://steamcommunity.com/id/*"],
+      "js": ["steamwishlistreader.js"]
+    }
+  ]
+
+}
