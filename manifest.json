@@ -5,6 +5,11 @@
   "name": "Steam Wishlist Exporter",
   "version": "1.0",
   "homepage_url": "https://github.com/ssj4maiko/Firefox-Addon---Steam-Wishlist-Exporter-Importer",
+  "permissions": [
+    "*://steamcommunity.com/",
+    "*://store.steampowered.com/api/",
+    "storage"
+  ],
   "icons": {
     "48": "icons/border-48.png"
   },
