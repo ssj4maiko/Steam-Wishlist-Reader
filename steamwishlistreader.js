@@ -2,31 +2,34 @@
 https://wiki.teamfortress.com/wiki/User:RJackson/StorefrontAPI
 	http://store.steampowered.com/api/appdetails?filters=basic,developers,publishers,release_date,price_overview,genres&appids=GAMEID
 */
-var  months = {}
-	,language = {
-		 remove: "remove"
-		,csvin: "CSV Import"
-		,csvout: "CSV Export"
-		,free: "Free"
-		,headers: ['Game ID','Original Rank','Type','Release Date','Product Name','Parent Product','Time Added','Price', 'Developer', 'Publisher','Genres','Store URL']
-		,currency: null
-		,priceDivider: 100
-		,API_ERROR: "There was an error checking for the game data. If you have over or almost 200 games on your wishlist, you may want to try again after 5 minutes"
-		,CACHE_ERROR: "There was an error on caching the data. Too many games?"
-	}
-	,progress = {
-		 total:0
-		,current:0
-		,counter:0
-	}
-	,today = new Date()
-	,cache = {}
-	,WLR_error = 0;
+/***
 
-let gettingItem = browser.storage.local.get();
-gettingItem.then(function(items){cache = items; console.log("REcovering Cache",cache);}, function(error){console.log("Error: ",error);});
-console.log("Cache:",cache);
+	For those trying to add their language to be compatible, these are the functions that must be changed. Use Ctrl+F to look at them:
 
+	function setLanguage
+		Copy one of the available case and add your lang option, you can see it at the <html>, use either Source Code or Inspect.
+		For the months object, you must change the index (the number values must be always the same), while you change the value
+		for everything else.
+
+	function getDivider
+		The cases come from the API based on your location, so even if you use another language, steam prices are still local. You can
+		find yours all over the internet, specially by making currency conversions on google. You can also try opening the API above,
+		just change GAMEID with another random game ID (As long as it has a price, of course).
+		Prices will come as an integer value, some currencies are usually divided in a centesimal value (Divide by 100),
+		others are not (Divide by 1), maybe there are some with decimals or even multipliers, I don't know.
+
+		For translators that can program, you don't need a new case/break if it's an option that already exists, you can just add
+		the Case at any point before the break you need. I left USD and BRL as an example of what you can do.
+
+	WLR_timeConverter
+		This is gonna be harder and will need direct programming. Dates are formatted in significantly different ways in all regions,
+		you need to work the string that is given and fill the <day>, <month> and <year> variables. If you can program or do Javascript,
+		ask for help.
+
+		Also a Tip, since this happened in the english version, items added in the current year may not contain the year itself, this
+		means that tabs and buttons may appear at on the month item.
+
+***/
 function setLanguage(lang){
 	switch(lang){
 		case 'en':
@@ -44,13 +47,14 @@ function setLanguage(lang){
 				,november	: '11'
 				,december	: '12'
 			}
-			language.remove 	= "remove";	// Lowercase
-			language.csvin		= "CSV Import";
-			language.csvout		= "CSV Export";
-			language.free		= "Free";
-			language.headers	= ['Game ID','Original Rank','Type','Release Date','Product Name','Parent Product','Time Added','Price', 'Developer', 'Publisher','Genres','Store URL'];
-			language.API_ERROR	= "There was an error checking for the game data. If you have over or almost 200 games on your wishlist, you may want to try again after 5 minutes";
-			language.CACHE_ERROR= "There was an error on caching the data. Too many games?";
+			language.remove 		= "remove";	// Lowercase
+			language.csvin			= "CSV Import";
+			language.csvout			= "CSV Export";
+			language.free			= "Free";
+			language.headers		= ['Game ID','Original Rank','Type','Release Date','Product Name','Parent Product','Time Added','Price', 'Developer', 'Publisher','Genres','Store URL'];
+			language.API_ERROR		= "There was an error checking for the game data for {n_error} game(s).\n It could be a game is not listed on Steam anymore,\n or the API is unresponsive because we made too many requests, in which case, try again in ~5 minutes.";
+			language.CACHE_ERROR	= "There was an error on caching the data. Too many games?";
+			language.WRONG_FILETYPE	= "You selected a file that doesn't seem right. Save it as a CSV file, \" for strings";
 		break;
 		default:
 			alert("Wishlist Steam Export does not support your language yet.")
@@ -74,6 +78,46 @@ function getDivider(cur){
 	}
 	return language.priceDivider;
 }
+var  months = {}
+	,language = {
+		 remove: "remove" 		// The content which is written next to the date. This is used to identify and remove that.
+		,csvin: "CSV Import"	// Button Lavels
+		,csvout: "CSV Export"
+		,free: "Free"			// Price for Free games at the CSV
+		,headers: ['Game ID','Original Rank','Type','Release Date','Product Name','Parent Product','Time Added','Price', 'Developer', 'Publisher','Genres','Store URL']
+		,currency: null			// Identified automatically
+		,priceDivider: 100		// Must be inserted at the getDivider function
+
+		,API_ERROR: "There was an error checking for the game data for {n_error} game(s). It could be a game is not listed on Steam anymore, or the API is unresponsive because we made too many requests, in which case, try again in ~5 minutes."
+		,CACHE_ERROR: "There was an error on caching the data. Too many games?"
+		,WRONG_FILETYPE: "You selected a file that doesn't seem right. Save it as a CSV file, \" for strings"
+	}
+	,progress = {
+		 total:0
+		,current:0
+		,counter:0
+	}
+	,today = new Date()
+	,cache = {}
+	,WLR_error = 0
+	,WLR_warning = 1;
+
+let gettingItem = browser.storage.local.get('cache');
+gettingItem.then(function(items){
+	if(typeof items.cache !== "undefined"){
+		cache = items.cache;
+	}
+	/*console.log("Recovering Cache",cache);*/
+}, function(error){
+	console.log("Error: ",error);
+});
+gettingItem = browser.storage.local.get('warning');
+gettingItem.then(function(value){
+	WLR_warning = value ? value.warning : 1;
+	/*console.log("Warning value",WLR_warning);*/}
+, function(error){warning = 1});
+
+
 setLanguage(document.documentElement.lang);
 
 
@@ -127,15 +171,12 @@ function WLR_timeConverter(date){
 			day = ('0'+date[0]).substr(-2);
 			month = date[1].replace(',','').trim();
 			month = months[month];
-			if(!month)
-				console.log(month,date,orig);
+			/*if(!month)
+				console.log(month,date,orig);*/
 			if(date[2])
 				year = date[2].substr(0,4);
 			else
 				year = today.getFullYear();
-			break;
-		case 'pt-br':
-			
 			break;
 		/**
 
@@ -161,28 +202,44 @@ function WLR_getItem(WLR_row){
 	// Because the content may be loaded on a cache or not, we must access the same function from any of the two options.
 	function loadItem(){
 		var  id = contents.id
-			,gamedata = cache[id][id].data;
+			,gamedata = cache[id].data;
 
-		console.log("Load Item",id,cache[id][id]);
-		contents.store_url		= logo.children[0].href.trim();
-		contents.icon			= logo.children[0].children[0].src.trim();
-		contents.name			= gamedata.name;//findTag(item,'h4').textContent.trim();
-		contents.type			= gamedata.type;
-		contents.parent			= gamedata.fullgame ? gamedata.fullgame.name : '';
-		contents.release_date	= gamedata.release_date.date;
-		contents.timeAdded		= WLR_timeConverter(findClass(item,'wishlist_added_on').textContent).trim();
-		contents.price	 		= gamedata.is_free ? language.free : (gamedata.price_overview ? gamedata.price_overview.initial * getDivider(gamedata.price_overview.currency) : '-');
-		contents.developers		= gamedata.developers.join(', ');
-		contents.publishers		= gamedata.publishers.join(', ');
+		//console.log("Load Item",id,gamedata);
+		if(gamedata){
+			contents.store_url		= logo.children[0].href.trim();
+			contents.icon			= logo.children[0].children[0].src.trim();
+			contents.name			= gamedata.name;//findTag(item,'h4').textContent.trim();
+			contents.type			= gamedata.type;
+			contents.parent			= gamedata.fullgame ? gamedata.fullgame.name : '';
+			contents.release_date	= gamedata.release_date.date;
+			contents.timeAdded		= WLR_timeConverter(findClass(item,'wishlist_added_on').textContent).trim();
+			contents.price	 		= gamedata.is_free ? language.free : (gamedata.price_overview ? gamedata.price_overview.initial / getDivider(gamedata.price_overview.currency) : '-');
+			contents.developers		= gamedata.developers.join(', ');
+			contents.publishers		= gamedata.publishers.join(', ');
 
-		var genres = [];
-		if(gamedata.genres){
-			for(var i=0; i<gamedata.genres.length; ++i){
-				genres.push(gamedata.genres[i].description);
+			var genres = [];
+			if(gamedata.genres){
+				for(var i=0; i<gamedata.genres.length; ++i){
+					genres.push(gamedata.genres[i].description);
+				}
+				contents.genres = genres.join(', ');
+			} else {
+				contents.genres = '-';
 			}
-			contents.genres = genres.join(', ');
 		} else {
-			contents.genres = '-';
+			contents.store_url		= logo.children[0].href.trim();
+			contents.icon			= logo.children[0].children[0].src.trim();
+			contents.name			= findTag(item,'h4').textContent.trim();
+			contents.type			= '-';
+			contents.parent			= '-';
+			contents.release_date	= '-';
+			contents.timeAdded		= WLR_timeConverter(findClass(item,'wishlist_added_on').textContent).trim();
+			var price = findClass(item,'price');
+			if(!price){		price = findClass(item,'discount_original_price');	}
+			if(price)		contents.price = price.textContent.trim();	else	contents.price = '-';
+			contents.developers		= '-';
+			contents.publishers		= '-';
+			contents.genres 		= '-';
 		}
 
 		var rank = findClass(item,'wishlist_rank');
@@ -190,17 +247,6 @@ function WLR_getItem(WLR_row){
 			contents.rank = rank.value.trim();
 		else
 			contents.rank = '';
-		/*
-		var price = findClass(item,'price');
-		if(!price){
-			price = findClass(item,'discount_original_price');
-		}
-
-		if(price)
-			contents.price = price.textContent.trim();
-		else
-			contents.price = '';
-		*/
 		WLR_gamesList.push(contents);
 		--progress.counter;
 	}
@@ -217,24 +263,31 @@ function WLR_getItem(WLR_row){
 			if (httpRequest.readyState === XMLHttpRequest.DONE) {
 				if (httpRequest.status === 200) {
 					var json = JSON.parse(httpRequest.responseText);
+					//console.log("JSON",json);
 					if(json[contents.id].success){
-						cache[contents.id] = json;
-						console.log("JSON",json);
-						// Once the info is cached, loadItem
-						loadItem();
-					} else {
-						--progress.counter;
-						WLR_error = 1;
+						delete json[contents.id].data.pc_requirements;
+						delete json[contents.id].data.mac0_requirements;
+						delete json[contents.id].data.linux_requirements;
+						delete json[contents.id].data.legal_notice;
+						delete json[contents.id].data.detailed_description;
+					}
+					cache[contents.id] = json[contents.id];
+					// Once the info is cached, loadItem
+					loadItem(json[contents.id].success);
+
+					if(!json[contents.id].success){
+						//--progress.counter;
+						++WLR_error;
 					}
 				} else {
 					console.log("Problem on connecting",httpRequest.status,'---',httpRequest);
 				}
 			}
 		};
-		httpRequest.open('GET', /*'http://localhost/steamwishlistreader/test.json'*/
-						'http://store.steampowered.com/api/appdetails?filters=basic,developers,publishers,release_date,price_overview,genres&appids='+contents.id);
+		httpRequest.open('GET', 'http://store.steampowered.com/api/appdetails?filters=basic,developers,publishers,release_date,'
+																					+'price_overview,genres&appids='+contents.id);
 		httpRequest.send();
-		console.log("Calling API for <",contents.id,">")
+		//console.log("Calling API for <",contents.id,">")
 	} else {
 		// info was already cached, loadItem
 		loadItem();
@@ -250,31 +303,49 @@ function WLR_getItem(WLR_row){
 
 function addButtons(){
 	var csvOut = document.getElementById('csvout_id');
-	if(!csvOut){
-		var  nextTo = document.getElementById('wishlist_sort_options')
-			,base = document.createElement('div')
-			,csvIn = document.createElement('button')
-			,csvOut = document.createElement('button')
-			;
-		csvOut.textContent = language.csvout;
-		csvOut.id = "csvout_id";
-		csvIn.textContent = language.csvin;
-		csvIn.id = "csvin_id";
-
-
-		base.appendChild(csvIn);
-		base.appendChild(csvOut);
-		base.classList.add('sort_options');
-
-		nextTo.parentNode.insertBefore(base,nextTo);
-	} else {
-		var csvIn = document.getElementById('csvin_id');
-		csvOut.removeEventListener('click',createCSV);
-		csvIn.removeEventListener('click',importCSV);
+	if(csvOut){
+		var csvIn = document.getElementById('csvin_id'),
+			base = csvOut.parentNode;
+		csvOut.parentNode.removeChild(csvOut);
+		csvIn.parentNode.removeChild(csvIn);
+		base.parentNode.removeChild(base);
 	}
 
+	var  nextTo = document.getElementById('save_action_disabled_1')
+		,base = document.createElement('div')
+		,csvIn = document.createElement('input')
+		,csvOut = document.createElement('input')
+		,labelIn = document.createElement('label')
+		,labelOut = document.createElement('label')
+		;
+
+	csvOut.value = "Download";
+	csvOut.id = "csvout_id";
+	csvOut.type = "button";
+	csvOut.style.display = "none";
+	labelOut.textContent = language.csvout;
+	labelOut.htmlFor = csvOut.id;
+
+	csvIn.textContent = language.csvin;
+	csvIn.id = "csvin_id";
+	csvIn.type = "file";
+	csvIn.style.display = "none";
+	labelIn.textContent = language.csvin;
+	labelIn.htmlFor = csvIn.id;
+
+
+	base.appendChild(labelOut);
+	base.appendChild(csvOut);
+	base.appendChild(labelIn);
+	base.appendChild(csvIn);
+	base.classList.add('WRL_Buttons');
+	console.log(base);
+	console.log(nextTo);
+
+	nextTo.parentNode.insertBefore(base,nextTo);
+
 	csvOut.addEventListener('click',createCSV);
-	csvIn.addEventListener('click',importCSV);
+	csvIn.addEventListener('change',importCSV);
 }
 
 function WLR_prepare(){
@@ -287,12 +358,11 @@ function WLR_prepare(){
 	WLR_error = 0;
 	
 	for(var i=0;i<progress.total;++i){
-		console.log("First Loop",progress);
+		//console.log("First Loop",progress);
 		progress.current = i+1;
 		WLR_getItem(WLR_content.children[i]);
-		//WLR_gamesList[tmp.id] = tmp;
 	}
-	console.log(progress);
+	//console.log(progress);
 }
 function download(name, val) {
 	var element = document.createElement('a');
@@ -310,59 +380,66 @@ function createCSV(e){
 	// Because async XHR can take some time to load, we keep it on a loop checking and updating the progress
 	WLR_prepare();
 	var intervalLoop = window.setInterval(function(){
-		console.log("First Loop",progress);
 		// Only run when everything is fully loaded
 		if(progress.total > 0 && progress.total == progress.current && progress.counter == 0){
 			//Stop loop
 			window.clearInterval(intervalLoop);
-			let setting = browser.storage.local.set(cache);
+			/*
+			let setting = browser.storage.local.clear();
+			setting.then(function(){
+				alert('Clear');
+			},null);
+			*/
+			setting = browser.storage.local.set({cache : cache});
 			setting.then(null, function(){
 				alert(language.CACHE_ERROR);
 			});
 
-			if(!WLR_error){
-					// CSV configuration variables
-				var  separator = ','
-					,textSep = '"'
-					,br = "\n"
-					// Function variables
-					,text = []
-					,row = []
-					,tmp = []
-					,header = language.headers;
+			// CSV configuration variables
+			var  separator = ','
+				,textSep = '"'
+				,br = "\n"
+				// Function variables
+				,text = []
+				,row = []
+				,tmp = []
+				,header = language.headers;
 
-				//Insert CSV Header
-				for(var i=0;i<header.length;++i){
-					row.push(textSep+header[i]+textSep);
+			//Insert CSV Header
+			for(var i=0;i<header.length;++i){
+				row.push(textSep+header[i]+textSep);
+			}
+			text.push(row.join(separator));
+
+			//Insert CSV content that was prepared on WLR_getItem
+			for(i=0;i < WLR_gamesList.length; ++i){
+				//		['Game ID','Original Rank','Type','Release Date','Product Name','Belongs to','Time Added','Price', 'Developer', 'Publisher','Genres','Store URL'];
+				tmp = [
+					 WLR_gamesList[i].id
+					,WLR_gamesList[i].rank
+					,WLR_gamesList[i].type
+					,WLR_gamesList[i].release_date
+					,WLR_gamesList[i].name
+					,WLR_gamesList[i].parent
+					,WLR_gamesList[i].timeAdded
+					,WLR_gamesList[i].price
+					,WLR_gamesList[i].developers
+					,WLR_gamesList[i].publishers
+					,WLR_gamesList[i].genres
+					,WLR_gamesList[i].store_url
+				];
+				row = [];
+				for(var j=0;j<tmp.length;++j){
+					row.push(textSep+tmp[j]+textSep);
 				}
 				text.push(row.join(separator));
-
-				//Insert CSV content that was prepared on WLR_getItem
-				for(i=0;i < WLR_gamesList.length; ++i){
-					//		['Game ID','Original Rank','Type','Release Date','Product Name','Belongs to','Time Added','Price', 'Developer', 'Publisher','Genres','Store URL'];
-					tmp = [
-						 WLR_gamesList[i].id
-						,WLR_gamesList[i].rank
-						,WLR_gamesList[i].type
-						,WLR_gamesList[i].release_date
-						,WLR_gamesList[i].name
-						,WLR_gamesList[i].parent
-						,WLR_gamesList[i].timeAdded
-						,WLR_gamesList[i].price
-						,WLR_gamesList[i].developers
-						,WLR_gamesList[i].publishers
-						,WLR_gamesList[i].genres
-						,WLR_gamesList[i].store_url
-					];
-					row = [];
-					for(var j=0;j<tmp.length;++j){
-						row.push(textSep+tmp[j]+textSep);
-					}
-					text.push(row.join(separator));
-				}
-				download("Wishlist.csv",text.join(br));
-			} else {
-				alert(language.API_ERROR);
+			}
+			download("Wishlist.csv",text.join(br));
+			
+			if(WLR_error > 1 || (WLR_error > 2 && WLR_warning == 1)){	
+				alert(language.API_ERROR.replace('{n_error}',WLR_error));
+				WLR_warning = 0;
+				browser.storage.local.set({warning : WLR_warning});
 			}
 		}
 	},5000);
@@ -370,8 +447,50 @@ function createCSV(e){
 	e.preventDefault();
 	return false;
 }
+
+function throwEverythingBack(){
+	var item, rank;
+	for(var i=0;i<WLR_content.children.length;++i){
+		item = findClass(WLR_content.children[i],'wishlistRowItem')
+		rank = findClass(item,'wishlist_rank');
+		rank.value = parseInt(rank.value.trim()) + 99000;
+	}
+}
+function reSortByCSV(csv){
+	var  br = "\n"
+		,separator = ','
+		,firstLine = 1;
+	if(csv.indexOf("\r\n") !== false)
+		br = "\r\n";
+	/*
+	if(csv.indexOf(';"') !== false)
+		separator = ";";
+	*/
+	csv = csv.split(br);
+	var event = new Event('change');
+
+	for(var i = firstLine; i<csv.length;++i){
+		if(csv[i] == '')
+			continue;
+		var gameId = csv[i].split(separator)[0];
+		WLR_form['priority['+gameId+']'].value = i;
+		WLR_form['priority['+gameId+']'].dispatchEvent(event);
+	}
+}
+
 function importCSV(e){
-	alert("will be done");
+	var  file = e.target.files[0]
+		,reader = new FileReader();
+
+	reader.onload = function(e){
+		if(e.target.result.indexOf(language.headers[0]) !== false){
+			throwEverythingBack();
+			reSortByCSV(e.target.result);
+		} else {
+			alert(language.WRONG_FILETYPE);
+		}
+	};
+	reader.readAsText(file);
 }
 /**********************
 
@@ -380,17 +499,3 @@ function importCSV(e){
 
 **********************/
 addButtons();
-
-/*
-function redirect(requestDetails) {
-	console.log("Redirecting: " + requestDetails);
-	return {
-		redirectUrl: "https://38.media.tumblr.com/tumblr_ldbj01lZiP1qe0eclo1_500.gif"
-	};
-}
-browser.webRequest.onBeforeRequest.addListener(
-	redirect
-	,{urls: ["*://store.steampowered.com/api/appdetails*"]}
-	,["blocking"]
-);
-*/
