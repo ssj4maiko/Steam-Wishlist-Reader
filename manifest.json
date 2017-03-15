@@ -11,7 +11,7 @@
     "storage"
   ],
   "icons": {
-    "48": "icons/border-48.png"
+    "100": "icons/icon_100.png"
   },
 
   "content_scripts": [

@@ -26,6 +26,8 @@ Besides the Steam API limitation, right now, the code only works with the Englis
 
 If you wanna help, there are instructions to add other language compatibility to the code. It was made in haste, also first addon, sorry about that.
 
+Also, even if it inserts all ranks correcntly, I have noticed that Steam seems to get easily lost on big wishlists, so keep your csv in hand just in case.
+
 Languages supported
 ------------------------------
 - English
