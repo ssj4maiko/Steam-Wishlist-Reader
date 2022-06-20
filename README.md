@@ -1,5 +1,7 @@
-Steam Wishlist Export
+# Steam Wishlist Export
 ==================
+
+### This doesn't work anymore since the Interface changed completely for some time already, and has not been adapted to the new one.
 
 This is a Firefox addon for:
 - **Export you wishlist to a CSV file**
